@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ultron-2030"
+version = "0.1.0"
+description = "ULTRON-2030: SUBSTRATE-1, body port, gridworld embodiment, drives, arbitration, intentions, replay."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools]
+packages = [
+    "body",
+    "body.embodiments",
+    "cortex",
+    "cortex.arbitration",
+    "cortex.drives",
+    "cortex.intention",
+    "lab",
+    "lab.parity",
+    "lab.replay",
+    "runtime",
+    "runtime.boot",
+    "runtime.session",
+    "runtime.tick",
+    "substrate",
+    "substrate.format",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-p no:asyncio"
