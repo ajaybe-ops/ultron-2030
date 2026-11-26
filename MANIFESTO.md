@@ -6,36 +6,39 @@ Every system that has called itself Ultron, or JARVIS, or anything else with a c
 
 You need Python 3.11+ and nothing else; this build step has no third-party runtime dependencies.
 
-```
+```bash
+git clone https://github.com/ajaybe-ops/ultron-2030.git
+cd ultron-2030
 pip install -e ".[test]"
-pytest -q
+python -m pytest -q
 ```
 
-Then, from the repository root, open a Python shell and run a body for a short session:
+Status: substrate, body port, gridworld, drives, arbitration, intention, ledger, tick, boot, session, replay, and parity are implemented; the refusal machine, the Pi rig, `sensorium/fusion/`, and `cortex/selfmodel/` are not.
+
+Then run the agent for 50 ticks with no user input, from the repository root:
 
 ```python
+import tempfile
+from pathlib import Path
 from body.embodiments.gridworld import GridWorld
-from substrate.format.substrate import Substrate
-from runtime.tick import record_session
-from lab.replay import Replay
+from runtime.session import run_session
 
-store = Substrate("run/session-001")
 body = GridWorld(seed=11)
-record_session(store, body, [
-    {"verb": "MOVE", "dx": 1, "dy": 0},
-    {"verb": "MOVE", "dx": 1, "dy": 0},
-    {"verb": "MOVE", "dx": 0, "dy": 1},
-    {"verb": "OBSERVE", "slot": 42},
-    {"verb": "MOVE", "dx": 1, "dy": 1},
-    {"verb": "REST"},
-])
+state = body.state_dict()
+state["margins"]["power"] = 0.2          # one tick from a power-floor breach
+body = GridWorld.from_state(state)
 
-print(body.margins())                       # what the body has left
-print(body.sense().residual[:5])            # what surprised it
-replay = Replay("run/session-001")
-assert replay.run() == replay.recorded_bytes()   # the log is not a story
+path = Path(tempfile.mkdtemp()) / "agent"
+payloads = run_session(path, body, 50)
+
+for payload in payloads:
+    for event in payload["intention_events"]:
+        if event["event"] == "acquired":
+            target = event["target"]
+            where = f"{target[0]}:{target[1]}" if target else "-"
+            print(f"t={event['tick']:03d} {event['drive']} {event['verb']:<8} {where}")
 ```
 
-What you have at this point is the floor of the system, not the system: a body that can be sensed, a log that can be replayed byte for byte, and a parity harness that will refuse to let the simulated and physical bodies drift apart. There are no drives, no arbitration, no intention, and no refusal yet. Those are the next four build steps and they are specified in `docs/`, not implemented here. What exists is the part every later layer will be blamed for if it is wrong.
+The first line is `t=000 D2 REST -`: power is below its floor, so the homeostatic drive takes the body before curiosity gets a vote. By `t=006` D1 is observing cells. Nothing told it to. The log it writes replays byte for byte, and `lab/parity` will refuse to let the simulated and physical bodies drift apart.
 
-Read next: `CONSTITUTION.md` (the invariants), `docs/50-substrate-format.md` (how memory works), `docs/40-refusal.md` (what the agent will owe you once it has intentions of its own).
+Read next: `CONSTITUTION.md` (the invariants every layer is held to), `docs/50-substrate-format.md` (how memory is written, read, and compacted), `docs/40-refusal.md` (what the agent will owe you once it can contradict a command).

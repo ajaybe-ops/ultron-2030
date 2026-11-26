@@ -2,7 +2,8 @@
 
 An embodied, self-directed agent that generates its own goals from three intrinsic drives, commits to them under a time-bounded lease, and keeps a log it can replay byte for byte. It is not an assistant.
 
-![tests](https://img.shields.io/badge/tests-81%20passing-brightgreen)
+<!-- Test status comes from the ci.yml workflow; it is not hand-maintained. -->
+[![ci](https://github.com/ajaybe-ops/ultron-2030/actions/workflows/ci.yml/badge.svg)](https://github.com/ajaybe-ops/ultron-2030/actions/workflows/ci.yml)
 ![python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![status](https://img.shields.io/badge/status-foundation%20complete-orange)
