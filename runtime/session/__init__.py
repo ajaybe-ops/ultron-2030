@@ -16,6 +16,7 @@ from typing import Any
 
 from body.port import Body
 from cortex.arbitration.config import ArbitrationConfig
+from cortex.selfmodel import SelfModel
 from runtime.boot import boot_from
 from runtime.tick import agent_tick, digest
 from substrate.format.substrate import Substrate
@@ -127,10 +128,13 @@ def run_session(
         _write_header(substrate, body, chosen)
 
     engine, ledger = boot_from(substrate, body, chosen)
+    selfmodel = SelfModel.from_substrate(substrate)
 
     payloads: list[dict[str, Any]] = []
     for _ in range(int(max_ticks)):
-        payload = agent_tick(engine, body, ledger, int(body.tick))
+        payload = agent_tick(
+            engine, body, ledger, int(body.tick), selfmodel=selfmodel
+        )
         _persist(substrate, payload)
         payloads.append(payload)
     return payloads

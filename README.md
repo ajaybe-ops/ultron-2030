@@ -26,16 +26,16 @@ Every system that has called itself Ultron, or JARVIS, or anything else with a c
 | `cortex/arbitration/` | Scoring, affordance and viability filters, asymmetric commit/preempt thresholds, DRIFT, and the VITAL override. | implemented |
 | `cortex/intention/` | Leases with `lease_until`, name-keyed success/abort tests, invariants, and action mapping. | implemented |
 | `cortex/ledger.py` | Negative knowledge: recurring failure signatures suppress candidates instead of lowering scores. | implemented |
-| `cortex/selfmodel/` | A self-model beyond the capability ledger. | not started |
-| `sensorium/fusion/` | A dedicated fusion stage. Fusion currently happens inside each body's `sense()`. | not started |
-| `negotiation/` | The refusal protocol specified in [docs/40-refusal.md](docs/40-refusal.md). | not started |
+| `cortex/selfmodel/` | Attempt memory: `CAPABILITY_PRESENT`/`ABSENT` with recency-weighted confidence, persisted and replayed. | implemented |
+| `sensorium/fusion/` | One timestamped vector from occupancy, surprise, viability, presence, and audio; gridworld and Pi adapters share the shape. | implemented |
+| `negotiation/` | The refusal protocol: pure four-way decision, persisted state machine, structured record, byte-identical replay. | implemented |
 | `runtime/tick/` | `agent_tick()`: sense → arbitrate → act → record. The real loop. | implemented |
 | `runtime/boot/` | Warm start: rebuilds the engine, ledger, drive states, and any live intention from the log. | implemented |
 | `runtime/session/` | `run_session()`: runs N ticks and persists tick, drive, and intention records. | implemented |
 | `lab/replay/` | Re-executes a session and asserts byte-identity; reports the first diverging tick and field. | implemented |
 | `lab/parity/` | Tensor-shape parity across replays and fresh bodies; `assert_agent_parity()` for agent sessions. | implemented |
-| `tests/` | 81 pytest tests, including a 200-tick loop and its byte-identical replay. | implemented |
-| `docs/` | Normative specifications: [40-refusal.md](docs/40-refusal.md), [50-substrate-format.md](docs/50-substrate-format.md). | specified |
+| `tests/` | 125 pytest tests, including a 200-tick loop and its byte-identical replay. | implemented |
+| `docs/` | Normative specifications: [40-refusal.md](docs/40-refusal.md), [50-substrate-format.md](docs/50-substrate-format.md), [60-selfmodel.md](docs/60-selfmodel.md). | specified |
 | `MANIFESTO.md`, `CONSTITUTION.md` | Normative prose: the premise and the invariants. | specified |
 
 ## Quick start
@@ -121,13 +121,13 @@ After that table, the point should be clear: this is not another JARVIS with a d
 
 ## What is not here yet, and why
 
-- **The refusal machine** (`negotiation/`). It requires a live intention to contradict. The intention layer landed in this build, so the refusal machine is next.
-- **The Pi rig** (`body/embodiments/rig_pi/`). It needs hardware. The port is four methods wide so it can be added without touching the core.
-- **`sensorium/fusion/`**. Fusion works today, but it is local to each body's `sense()`. Extracting it is a refactor, not a new capability.
-- **The full self-model** (`cortex/selfmodel/`). The capability ledger records what fails. It does not yet answer questions about itself.
-- **Dialogue, voice, and UI.** The agent cannot speak. Refusals exist as a specification, not an utterance.
+- **Refusal override and withdrawal** (`negotiation/`). The four-way decision, persistence, and replay are implemented. The override token, the `WITHDRAWN` transition, and repair-debt accounting are not; they need a dialogue counterpart and a notion of presence confidence.
+- **The Pi rig** (`body/embodiments/rig_pi/`). It needs hardware. The port is four methods wide so it can be added without touching the core, and the fusion adapter already accepts camera frames, PIR events, and microphone energy.
+- **Dialogue, voice, and UI.** The agent cannot speak. Refusals exist as structured records and a five-part utterance template, not as an utterance in the world.
 
 ## Build order, if you want to contribute
+
+Steps 1, 3, and 5 landed in this build; steps 2, 4, and 6 remain.
 
 1. **Refusal state machine** in `negotiation/`. Success: a command that contradicts a live intention returns `REFUSING` with a reason and an alternative, and the session still replays.
 2. **Refusal persistence.** Success: refusal records land in SUBSTRATE-1 and `assert_agent_parity()` still passes on a session that contains one.

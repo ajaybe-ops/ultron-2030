@@ -13,7 +13,7 @@ pip install -e ".[test]"
 python -m pytest -q
 ```
 
-Status: substrate, body port, gridworld, drives, arbitration, intention, ledger, tick, boot, session, replay, and parity are implemented; the refusal machine, the Pi rig, `sensorium/fusion/`, and `cortex/selfmodel/` are not.
+Status: substrate, body port, gridworld, drives, arbitration, intention, ledger, tick, boot, session, replay, parity, the refusal machine, the shared fusion stage, and the self-model are implemented; the Pi rig, refusal override and withdrawal, and the dialogue layer are not.
 
 Then run the agent for 50 ticks with no user input, from the repository root:
 

@@ -9,19 +9,31 @@ instance reproduces a recorded session's structure tick by tick.
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Iterable
 
 from body.types import CELL_FIELDS, Cell, Snapshot
+from cortex.selfmodel import SelfModelSnapshot
 from lab.replay import Replay
+from negotiation.machine import RefusalMachine
+from negotiation.state import Command, DrivePressure, RefusalRecord
 from runtime.tick import execute_tick
+from sensorium.fusion import FusedPerception, FusionStage, PerceptionBundle
 
 __all__ = [
+    "LayerTrace",
     "ParityError",
     "assert_agent_parity",
     "assert_fresh_body_parity",
+    "assert_fusion_parity",
+    "assert_fusion_shape_parity",
+    "assert_layered_parity",
+    "assert_refusal_parity",
+    "assert_selfmodel_parity",
     "assert_session_parity",
     "assert_structural_parity",
     "structural_signature",
+    "trace_layers",
 ]
 
 
@@ -128,3 +140,109 @@ def assert_fresh_body_parity(path: Any) -> int:
         produced = Snapshot.from_dict(execute_tick(body, action)["snapshot"])
         assert_structural_parity(recorded[index], produced, tick=index)
     return len(recorded)
+
+
+# --------------------------------------------------------------- new layers
+
+
+def assert_fusion_shape_parity(
+    left: FusedPerception, right: FusedPerception
+) -> None:
+    """The vector shape is embodiment-independent; values need not be."""
+    if left.channels != right.channels:
+        raise ParityError(
+            f"fusion channels {left.channels} != {right.channels}"
+        )
+    if left.width != right.width:
+        raise ParityError(f"fusion width {left.width} != {right.width}")
+
+
+def assert_fusion_parity(left: FusedPerception, right: FusedPerception) -> None:
+    """Byte-identical fusion, for the same perception bundle."""
+    assert_fusion_shape_parity(left, right)
+    if left.canonical_bytes() != right.canonical_bytes():
+        raise ParityError(
+            f"fusion bytes differ at tick {left.seq}: "
+            f"{left.values} != {right.values}"
+        )
+
+
+def assert_refusal_parity(
+    left: Iterable[RefusalRecord], right: Iterable[RefusalRecord]
+) -> int:
+    """Every refusal decision must be byte-identical, in order."""
+    left_records = tuple(left)
+    right_records = tuple(right)
+    if len(left_records) != len(right_records):
+        raise ParityError(
+            f"refusal count {len(left_records)} != {len(right_records)}"
+        )
+    for index, (a, b) in enumerate(zip(left_records, right_records)):
+        if a.canonical_bytes() != b.canonical_bytes():
+            raise ParityError(
+                f"refusal {index} differs: {a.outcome}/{a.state} "
+                f"!= {b.outcome}/{b.state}"
+            )
+    return len(left_records)
+
+
+def assert_selfmodel_parity(
+    left: SelfModelSnapshot | None, right: SelfModelSnapshot | None
+) -> None:
+    """The self-model state must be byte-identical after the same attempts."""
+    if left is None and right is None:
+        return
+    if left is None or right is None:
+        raise ParityError("one side has a self-model and the other does not")
+    if left.canonical_bytes() != right.canonical_bytes():
+        raise ParityError(
+            f"self-model differs at tick {left.tick}: "
+            f"{sorted(left.capabilities)} != {sorted(right.capabilities)}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class LayerTrace:
+    """The three new layers captured for one session."""
+
+    fusion: tuple[FusedPerception, ...]
+    refusals: tuple[RefusalRecord, ...]
+    selfmodel: SelfModelSnapshot | None
+
+
+def trace_layers(
+    bundles: Iterable[PerceptionBundle],
+    commands: Iterable[Command],
+    intention: Any,
+    self_model_snapshot: SelfModelSnapshot | None,
+    drive_pressures: Iterable[DrivePressure],
+) -> LayerTrace:
+    """Run fusion and refusal over a fixed input sequence, without a body.
+
+    This is the cross-embodiment check: the same bundles and commands must
+    produce the same bytes whether they came from a gridworld or a rig.
+    """
+    stage = FusionStage()
+    fused = tuple(stage.fuse(bundle) for bundle in bundles)
+    machine = RefusalMachine()
+    pressures = tuple(drive_pressures)
+    refusals = tuple(
+        machine.receive(command, intention, self_model_snapshot, pressures)
+        for command in commands
+    )
+    return LayerTrace(fusion=fused, refusals=refusals, selfmodel=self_model_snapshot)
+
+
+def assert_layered_parity(left: LayerTrace, right: LayerTrace) -> None:
+    """Fusion, refusal, and self-model parity in one call."""
+    if len(left.fusion) != len(right.fusion):
+        raise ParityError(
+            f"fusion length {len(left.fusion)} != {len(right.fusion)}"
+        )
+    for index, (a, b) in enumerate(zip(left.fusion, right.fusion)):
+        try:
+            assert_fusion_parity(a, b)
+        except ParityError as exc:
+            raise ParityError(f"fusion {index}: {exc}") from exc
+    assert_refusal_parity(left.refusals, right.refusals)
+    assert_selfmodel_parity(left.selfmodel, right.selfmodel)

@@ -34,6 +34,7 @@ from cortex.arbitration.engine import Engine
 from cortex.drives.state import DriveState
 from cortex.intention.lease import Intention
 from cortex.ledger import CapabilityLedger
+from cortex.selfmodel import SelfModel
 from substrate.format.substrate import Record, Substrate
 from runtime.tick import agent_tick, canonical_bytes, execute_tick
 
@@ -189,8 +190,18 @@ class Replay:
             out.append(canonical_bytes(actual))
         return b"\n".join(out)
 
-    def _agent_initial_state(self, lo: int) -> tuple[dict[str, Any], dict[str, DriveState], Intention | None, CapabilityLedger]:
+    def _agent_initial_state(self, lo: int) -> tuple[dict[str, Any], dict[str, DriveState], Intention | None, CapabilityLedger, SelfModel]:
         header = self._session.payload
+        if lo == 0:
+            selfmodel = SelfModel()
+        else:
+            previous = self._ticks[lo - 1].payload
+            raw_model = previous.get("selfmodel")
+            selfmodel = (
+                SelfModel.from_dict(raw_model)
+                if raw_model
+                else SelfModel.from_substrate(self.substrate, before_tick=lo)
+            )
         if lo == 0:
             body_state = dict(header["state"])
             drive_states = {name: DriveState() for name in ("D1", "D2", "D3")}
@@ -211,7 +222,7 @@ class Replay:
                 if record.kind == "ledger" and int(record.payload.get("tick", -1)) < lo
             ]
             ledger = CapabilityLedger.from_records(payloads)
-        return body_state, drive_states, current, ledger
+        return body_state, drive_states, current, ledger, selfmodel
 
     def _iter_agent(self) -> Iterator[tuple[int, dict[str, Any], dict[str, Any]]]:
         """Yield `(index, recorded_payload, produced_payload)` for the range."""
@@ -221,7 +232,7 @@ class Replay:
         stored = header.get("config")
         config = ArbitrationConfig.from_dict(stored) if stored else ArbitrationConfig()
 
-        body_state, drive_states, current, ledger = self._agent_initial_state(lo)
+        body_state, drive_states, current, ledger, selfmodel = self._agent_initial_state(lo)
 
         engine = Engine(config)
         engine.drive_states = drive_states
@@ -229,8 +240,15 @@ class Replay:
 
         for index in range(lo, hi + 1):
             body = self._body_for(body_state, class_name)
-            produced = agent_tick(engine, body, ledger, index)
-            yield index, self._ticks[index].payload, produced
+            recorded = self._ticks[index].payload
+            produced = agent_tick(
+                engine,
+                body,
+                ledger,
+                index,
+                selfmodel=selfmodel if "selfmodel" in recorded else None,
+            )
+            yield index, recorded, produced
             body_state = produced["body_state"]
 
     def _run_agent(self) -> bytes:

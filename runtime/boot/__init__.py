@@ -19,9 +19,10 @@ from cortex.arbitration.engine import Engine
 from cortex.drives.state import DriveState
 from cortex.intention.lease import Intention
 from cortex.ledger import CapabilityLedger
+from cortex.selfmodel import SelfModel
 from substrate.format.substrate import Record, Substrate
 
-__all__ = ["boot", "boot_from", "reconstruct"]
+__all__ = ["boot", "boot_from", "boot_selfmodel", "reconstruct"]
 
 
 def _session_record(records: list[Record]) -> Record | None:
@@ -93,3 +94,8 @@ def boot(
     a caller cannot boot without one; the engine never reads it here.
     """
     return boot_from(Substrate(substrate_path), body, config)
+
+
+def boot_selfmodel(substrate: Substrate) -> SelfModel:
+    """Rebuild the self-model from the same log, ready to append new attempts."""
+    return SelfModel.from_substrate(substrate)

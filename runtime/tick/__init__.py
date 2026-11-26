@@ -31,6 +31,7 @@ from body.types import Margins, Snapshot, canonical_bytes
 from cortex.arbitration.engine import Engine
 from cortex.intention.lease import Intention
 from cortex.ledger import CapabilityLedger
+from cortex.selfmodel import SelfModel
 from substrate.format.substrate import Record, Substrate
 
 __all__ = [
@@ -117,8 +118,15 @@ def agent_tick(
     body: Body,
     ledger: CapabilityLedger,
     tick_index: int,
+    selfmodel: SelfModel | None = None,
 ) -> dict[str, Any]:
-    """One full agent step: sense, arbitrate, act, record."""
+    """One full agent step: sense, arbitrate, act, record.
+
+    `selfmodel` is optional so the foundation build's tests and any old
+    recording remain valid. When supplied, the attempt is recorded in it and
+    its snapshot is part of the tick payload, which is what makes the model
+    replayable rather than merely persistent.
+    """
     snapshot = body.sense()
     margins = body.margins()
     before = engine.current
@@ -136,6 +144,8 @@ def agent_tick(
     ledger.record(
         action["verb"], result.ok, result.detail, tick_index, preconditions={}
     )
+    if selfmodel is not None:
+        selfmodel.record(action["verb"], result.ok, result.detail, tick_index)
 
     body_state = body.state_dict() if callable(getattr(body, "state_dict", None)) else None
     final = body.sense()
@@ -154,6 +164,8 @@ def agent_tick(
     }
     if body_state is not None:
         payload["body_state"] = body_state
+    if selfmodel is not None:
+        payload["selfmodel"] = selfmodel.snapshot(tick_index).to_dict()
     return payload
 
 

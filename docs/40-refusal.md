@@ -1,6 +1,18 @@
 # 40 — Refusal protocol
 
-Normative. This document defines when the agent refuses, what it says, and what it does instead. It is not implemented in this build step: there are no drives, no arbitration, and no intentions yet. It is written now because the later layers must be built to satisfy it, not retrofitted to it.
+## Status
+
+Implemented and tested: the pure four-way decision (`negotiation/refusal.py`),
+the command → evaluate → respond → persist state machine
+(`negotiation/machine.py`), and the structured, replayable `RefusalRecord`.
+Proof: [`tests/test_refusal.py`](../tests/test_refusal.py), with cross-layer
+parity in [`tests/test_layer_parity.py`](../tests/test_layer_parity.py).
+
+Not yet implemented: override tokens (`YIELDED`), withdrawal detection
+(`WITHDRAWN`), repair-debt accounting, and the dialogue layer that speaks the
+utterance. The decision order, states, grammar, and rules below are unchanged.
+
+Normative. This document defines when the agent refuses, what it says, and what it does instead. See Status above for what this build implements; the sections below remain the specification the implementation must satisfy.
 
 Refusal is an architectural primitive, not a safety filter. It is produced by comparing a command against the agent's current intention, using the same arbitration inputs that generated that intention. Nothing inspects the command's text.
 
